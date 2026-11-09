@@ -26,7 +26,7 @@ jobs:
           set -uo pipefail
           repos=$(gh repo list "$ORG" --limit 2000 --no-archived \
             --json nameWithOwner,deleteBranchOnMerge \
-            -q '.[] | select(.deleteBranchOnMerge==false) | .nameWithOwner')
+            -q '.[] | select(.deleteBranchOnMerge==false) | .nameWithOwner')             || { echo "::error::cannot list $ORG repos - is ORG_REPO_ADMIN_TOKEN expired?"; exit 1; }
           ok=0; fail=0
           for r in $repos; do
             if gh repo edit "$r" --delete-branch-on-merge; then
