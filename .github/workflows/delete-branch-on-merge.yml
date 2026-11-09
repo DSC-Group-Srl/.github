@@ -1,0 +1,40 @@
+name: Enforce delete-branch-on-merge
+
+# GitHub has no org-wide default for "Automatically delete head branches".
+# This job turns it on daily for every non-archived repo that still has it off,
+# so new repos are fixed within a day of being created.
+# Needs secret ORG_REPO_ADMIN_TOKEN: fine-grained PAT, owner DSC-Group-Srl,
+# all repositories, Administration: read and write.
+
+on:
+  schedule:
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Turn on delete-branch-on-merge where it is off
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.ORG_REPO_ADMIN_TOKEN }}
+          ORG: DSC-Group-Srl
+        run: |
+          set -uo pipefail
+          repos=$(gh repo list "$ORG" --limit 2000 --no-archived \
+            --json nameWithOwner,deleteBranchOnMerge \
+            -q '.[] | select(.deleteBranchOnMerge==false) | .nameWithOwner')
+          ok=0; fail=0
+          for r in $repos; do
+            if gh repo edit "$r" --delete-branch-on-merge; then
+              echo "on: $r"; ok=$((ok+1))
+            else
+              echo "::error::failed: $r"; fail=$((fail+1))
+            fi
+          done
+          echo "updated=$ok failed=$fail"
+          echo "### delete-branch-on-merge: updated $ok, failed $fail" >> "$GITHUB_STEP_SUMMARY"
+          [ "$fail" -eq 0 ]
